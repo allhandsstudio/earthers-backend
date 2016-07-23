@@ -6,9 +6,58 @@
 	<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r79/three.js"></script>
 	<script src="OrbitControls.js"></script>
 	<script>
-		var R = 637.8
+		var R = 637.8;
+		var MINUTES_PER_DAY = 5;
 		var camera, scene, renderer, container, lights;
 		var globeMesh, sunMesh, moonMesh, glowMesh, skybox;
+		var raycaster, mouse;
+		var geo_data;
+		var variableMeshes = [];
+
+		function displayVariable(data, height, min, max) {
+			var Rv = R * height;
+			var geo = new THREE.Geometry();
+			var vi = 0;
+			$.each(geo_data, function(i, cell) {
+				var vp = getVertexPositions(cell, Rv);
+				geo.vertices.push(
+					new THREE.Vector3(vp[0][0], vp[0][1], vp[0][2]),
+					new THREE.Vector3(vp[1][0], vp[1][1], vp[1][2]),
+					new THREE.Vector3(vp[2][0], vp[2][1], vp[2][2]),
+					new THREE.Vector3(vp[3][0], vp[3][1], vp[3][2]),
+					new THREE.Vector3(vp[4][0], vp[4][1], vp[4][2]),
+					new THREE.Vector3(vp[5][0], vp[5][1], vp[5][2]));
+				faces = [
+					// outer tile
+					new THREE.Face3(0+vi, 1+vi, 2+vi),
+					new THREE.Face3(3+vi, 4+vi, 5+vi),
+					new THREE.Face3(0+vi, 2+vi, 3+vi),
+					new THREE.Face3(0+vi, 3+vi, 5+vi),
+				];
+				vi += 6;
+				var range = max - min;
+				var v = Math.min(Math.max(data[cell.grid_index] - min, 0), range) / range;
+				$.each(faces, function(i, face) { face.color.setHSL( v, 1.0, 0.5 ); });
+				$.each(faces, function(i, face) { geo.faces.push(face); });
+			});
+
+			geo.computeBoundingSphere();
+			geo.computeFaceNormals();
+			geo.computeVertexNormals();
+			var material = new THREE.MeshPhongMaterial( 
+				{
+					color: 0xffffff,
+					shading: THREE.FlatShading,
+					vertexColors: THREE.FaceColors,
+					transparent: true,
+					opacity: 0.35
+				} 
+			);
+			var variableMesh = new THREE.Mesh(geo, material);
+			scene.add(variableMesh);
+			variableMesh.rotation.y = globeMesh.rotation.y;
+			variableMeshes.push(variableMesh);
+		}
 
 		function toRadians(d) {
 			return d * Math.PI / 180.0;
@@ -33,7 +82,6 @@
 				dR = 0;
 			var vp1 = getVertexPositions(cell, R + dR);
 			var vp2 = getVertexPositions(cell, R - dR);
-			var color = 0x0000f0;
 			geo.vertices.push(
 				new THREE.Vector3(vp1[0][0], vp1[0][1], vp1[0][2]),
 				new THREE.Vector3(vp1[1][0], vp1[1][1], vp1[1][2]),
@@ -70,6 +118,7 @@
 
 				// inner tile
 			];
+			$.each(faces, function(i, f) { f.grid_index = cell.grid_index })
 			// faces = [
 			// 	new THREE.Face3(2+vi, 1+vi, 0+vi),
 			// 	new THREE.Face3(5+vi, 4+vi, 3+vi),
@@ -99,11 +148,15 @@
 
 		function init(json) {
 			console.log('init');
+			geo_data = json;
 			container = document.getElementById( 'container' );
 			camera = new THREE.PerspectiveCamera( 36, window.innerWidth / window.innerHeight, 1, 100000000 );
 			camera.position.z = 3000;
 			camera.lookAt(0, 0, 0);
 			scene = new THREE.Scene();
+
+			raycaster = new THREE.Raycaster();
+			mouse = new THREE.Vector2();
 
 			var ambientLight = new THREE.AmbientLight( 0x444444 );
 			scene.add( ambientLight );
@@ -152,24 +205,24 @@
 			// Atmosphere Glow
 			// ---------------------
 
-			var glowGeometry = new THREE.SphereGeometry(R * 1.02, 64, 64);
-			var glowMaterial = new THREE.ShaderMaterial( 
-			{
-			    uniforms: 
-				{ 
-					"c":   { type: "f", value: 0.9 },
-					"p":   { type: "f", value: 2.8 },
-					glowColor: { type: "c", value: new THREE.Color(0xb2b2ff) },
-					viewVector: { type: "v3", value: camera.position }
-				},
-				vertexShader:   document.getElementById( 'vertexShader'   ).textContent,
-				fragmentShader: document.getElementById( 'fragmentShader' ).textContent,
-				side: THREE.FrontSide,
-				blending: THREE.AdditiveBlending,
-				transparent: true
-			}   );
-			glowMesh = new THREE.Mesh(glowGeometry, glowMaterial);
-			scene.add(glowMesh);
+			// var glowGeometry = new THREE.SphereGeometry(R * 1.05, 64, 64);
+			// var glowMaterial = new THREE.ShaderMaterial( 
+			// {
+			//     uniforms: 
+			// 	{ 
+			// 		"c":   { type: "f", value: 0.9 },
+			// 		"p":   { type: "f", value: 2.8 },
+			// 		glowColor: { type: "c", value: new THREE.Color(0xb2b2ff) },
+			// 		viewVector: { type: "v3", value: camera.position }
+			// 	},
+			// 	vertexShader:   document.getElementById( 'vertexShader'   ).textContent,
+			// 	fragmentShader: document.getElementById( 'fragmentShader' ).textContent,
+			// 	side: THREE.FrontSide,
+			// 	blending: THREE.AdditiveBlending,
+			// 	transparent: true
+			// }   );
+			// glowMesh = new THREE.Mesh(glowGeometry, glowMaterial);
+			// scene.add(glowMesh);
 
 			// ---------------------
 			// Sun
@@ -237,8 +290,39 @@
 			controls.enableDamping = true;
 			controls.dampingFactor = 0.25;
 			controls.enableZoom = true;
+
+			document.addEventListener( 'mousedown', onDocumentMouseDown, false );
+
 			console.log("done init");
+
+			// fetchVariable("../tools/run_i-5240bec6_ts_CLDLOW.json", 31, 1.025)
+			// fetchVariable("../tools/run_i-5240bec6_ts_CLDMED.json", 31, 1.035)
+			fetchVariable("../tools/run_i-5240bec6_ts_TS.json", 31, 1.02, 230, 310)
 			animate();
+		}
+
+		function fetchVariable(filename, time, height, min, max) {
+			console.log(filename)
+			$.getJSON(filename, function(varData) {
+				timeData = varData[time];
+				displayVariable(timeData, height, min, max);
+			});
+
+		}
+
+		function onDocumentMouseDown( event ) {
+			event.preventDefault();
+
+			mouse.x = ( event.clientX / renderer.domElement.clientWidth ) * 2 - 1;
+			mouse.y = - ( event.clientY / renderer.domElement.clientHeight ) * 2 + 1;
+
+			raycaster.setFromCamera( mouse, camera );
+
+			var intersects = raycaster.intersectObjects( [globeMesh] );
+
+			if ( intersects.length > 0 ) {
+				console.log(geo_data[intersects[0].face.grid_index]);
+			}
 		}
 
 		function onWindowResize() {
@@ -258,19 +342,20 @@
 
 			var now = Date.now();
 			var elapsed = now - last;
-			var deltaTheta = 2 * Math.PI * (elapsed / (60000));
+			var deltaTheta = 2 * Math.PI * (elapsed / (MINUTES_PER_DAY * 60000));
 			globeMesh.rotation.y += deltaTheta;
+			$.each(variableMeshes, function(i, mesh) { mesh.rotation.y += deltaTheta });
 			last = now;
 
 			elapsed = now - start;
 			moonMesh.position.set(
-				38400 * Math.cos(2 * Math.PI * (elapsed / (30 * 60000))),
+				38400 * Math.cos(2 * Math.PI * (elapsed / (MINUTES_PER_DAY * 30 * 60000))),
 				0,
-				38400 * Math.sin(-2 * Math.PI * (elapsed / (30 * 60000)))
+				38400 * Math.sin(-2 * Math.PI * (elapsed / (MINUTES_PER_DAY * 30 * 60000)))
 				);
 
-			glowMesh.material.uniforms.viewVector.value = 
-				new THREE.Vector3().subVectors( camera.position, glowMesh.position );
+			// glowMesh.material.uniforms.viewVector.value = 
+			// 	new THREE.Vector3().subVectors( camera.position, glowMesh.position );
 		}
 	
 		window.onload = function() {

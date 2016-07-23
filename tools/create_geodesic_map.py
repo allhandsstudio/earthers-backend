@@ -1,9 +1,14 @@
+"""
+Create a geodesic data file suitable for display from source static data files,
+remapping from a standard grid to the geodesic grid
+"""
+
 from netCDF4 import Dataset
 import numpy as np
 import json
 
 mapping_file = '../grids/rmp_C40962_to_0.9x1.25_conserv.nc'
-geocode_file = 'geocodes_40962.json'
+geocode_file = '../data/geocodes_40962.json'
 source_data = [
     {
         'filename': '../data/surfdata_0.9x1.25_simyr2000_c120319.nc',
@@ -49,7 +54,7 @@ def init_geodesic_data(mapping_ds):
     area = mapping_ds.variables['area_a']
     # print(xc[0:10])
     data = []
-    for i in range(len(xc)):
+    for i in range(1, len(xc)):
         if i % 10000 == 0:
             print(i)
         cell = {
@@ -87,7 +92,7 @@ def init_weights(mapping_ds):
             a_to_s[a_i] = []
             a_to_b[a_i] = []
         a_to_s[a_i].append(S[i])
-        a_to_b[a_i].append(b_inds[i])
+        a_to_b[a_i].append(b_inds[i] - 1)
 
     return a_to_s, a_to_b
 
