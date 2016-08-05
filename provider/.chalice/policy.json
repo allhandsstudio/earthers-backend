@@ -1,0 +1,35 @@
+{
+  "Version": "2012-10-17", 
+  "Statement": [
+    {
+      "Action": [
+        "logs:CreateLogGroup", 
+        "logs:CreateLogStream", 
+        "logs:PutLogEvents"
+      ], 
+      "Resource": "arn:aws:logs:*:*:*", 
+      "Effect": "Allow"
+    }, 
+    {
+      "Action": [
+        "dynamodb:Scan", 
+        "dynamodb:Query"
+      ], 
+      "Resource": "arn:aws:dynamodb:*:*:*", 
+      "Effect": "Allow"
+    }, 
+    {
+      "Action": [
+        "s3:ListAllMyBuckets", 
+        "s3:ListObjects", 
+        "s3:ListBucket", 
+        "s3:*"
+      ], 
+      "Resource": [
+        "*"
+      ], 
+      "Effect": "Allow", 
+      "Sid": "9155de6ad1d74e4c8b1448255770e60c"
+    }
+  ]
+}
