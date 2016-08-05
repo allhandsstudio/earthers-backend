@@ -12,7 +12,8 @@ var Panel = require('react-bootstrap').Panel;
 var Form = require('react-bootstrap').Form;
 var FormGroup = require('react-bootstrap').FormGroup;
 var ControlLabel = require('react-bootstrap').ControlLabel;
-var EarthScene = require('./globe.js').EarthScene;
+var initScene = require('./globe.js').initScene;
+var loadVariableIntoScene = require('./globe.js').loadVariable;
 
 var runs = [
 	{name: 'i-54e4fec1'},
@@ -20,7 +21,7 @@ var runs = [
 	{name: 'i-759d7be1'},
 	{name: 'i-26ae4ab2'},
 	{name: 'i-d4c62640'}
-]
+];
 
 const PROVIDER_URI = 'https://4vesdtyv82.execute-api.us-west-2.amazonaws.com/dev';
 
@@ -42,7 +43,7 @@ var styles = {
   menu: {
     border: 'solid 1px #ccc'
   }
-}
+};
 
 var menuStyle = {
         borderRadius: '3px',
@@ -54,12 +55,12 @@ var menuStyle = {
         overflow: 'auto',
         zIndex: 1000,
         maxHeight: '50%'
-    }
+    };
 
 var inputStyle = {
 	fontSize: '14px',
 	marginTop: '4px'
-}
+};
 
 function matchToTerm (field) {
 	return function(item, value) {
@@ -86,7 +87,7 @@ var ViewPanel = React.createClass({
 		console.log('Loading geo data');
 		$.getJSON("./data/geodesic_data.json", function(json) {
 			console.log('done loading geo data');
-			new EarthScene(json);
+			initScene(json);
 		});		
 	}
 })
@@ -139,7 +140,7 @@ var OutputVariablePicker = React.createClass({
 		}
 	},
 	onVariableSelect: function(item) {
-		this.setState({ searchText: item.varName });
+		this.setState({ searchText: item.model+' - '+item.varName });
 		this.props.variableSelected(item)
 	},
 	render: function() {
@@ -197,6 +198,7 @@ var NavigatorPanel = React.createClass({
 		console.log('Loading '+runId);
 		this.setState({ variables: [] });
 		this.setLoading(true);
+		this.props.selectRun(runId);
 		$.ajax({
 			url: PROVIDER_URI+'/run/'+runId,
 			dataType: 'json',
@@ -228,10 +230,15 @@ var NavigatorPanel = React.createClass({
 					
 					<OutputVariablePicker 
 						getItems={this.state.variables}
+						variableSelected={this.props.selectVariable}
 					/>
 					<FormGroup>
 						<Col smOffset={2} sm={2}>
-							<Button bsSize="small" bsStyle="primary">Engage!</Button>
+							<Button 
+								bsSize="small" 
+								bsStyle="primary" 
+								onClick={this.props.onButtonClick}>Engage!
+							</Button>
 						</Col>
 					</FormGroup>
 				</Form>
@@ -241,10 +248,27 @@ var NavigatorPanel = React.createClass({
 })
 
 var MainPanel = React.createClass({
+	getInitialState: function() {
+		return {
+			selectedRun: null,
+			selectedVariable: null
+		}
+	},
+	onLoadButtonClick: function() {
+		console.log(this.state.selectedRun);
+		console.log(this.state.selectedVariable);
+		// ugly to use global variable, but whatever
+		loadVariableIntoScene(
+			this.state.selectedRun, this.state.selectedVariable.model, this.state.selectedVariable.varName);
+	},
 	render: function() {
 		return (
-			<div className="mainPanel"  style={{width: "20%"}}>
-				<NavigatorPanel />
+			<div className="mainPanel" style={{width: "20%"}}>
+				<NavigatorPanel 
+					selectRun={(runId) => {this.setState({ selectedRun: runId })}}
+					selectVariable={(variable) => {this.setState({ selectedVariable: variable})}}
+					onButtonClick={this.onLoadButtonClick}
+				/>
 				<ControlPanel />
 				<ViewPanel />
 			</div>

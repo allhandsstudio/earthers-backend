@@ -1,6 +1,8 @@
 var $ = require("jquery");
 var THREE = require("THREE");
 
+const PROVIDER_URI = 'https://4vesdtyv82.execute-api.us-west-2.amazonaws.com/dev';
+
 const R = 637.8;
 const MINUTES_PER_DAY = 5;
 
@@ -8,85 +10,124 @@ function toRadians(d) {
 	return d * Math.PI / 180.0;
 }
 
-class EarthScene {
-	constructor(geo_data) {
-		this.container = document.getElementById( 'scene-container' );
-		this.camera = new THREE.PerspectiveCamera( 36, window.innerWidth / window.innerHeight, 1, 100000000 );
-		this.camera.position.z = 3000;
-		this.camera.lookAt(0, 0, 0);
-		this.scene = new THREE.Scene();
+var container, camera, scene, raycaster, mouse, ambientLight, lights, renderer;
+var globe, variableMesh;
+var start, last;
 
-		this.raycaster = new THREE.Raycaster();
-		this.mouse = new THREE.Vector2();
 
-		this.ambientLight = new THREE.AmbientLight( 0x444444 );
-		this.scene.add( this.ambientLight );
+var initScene = function(geo_data) {
+	container = document.getElementById( 'scene-container' );
+	camera = new THREE.PerspectiveCamera( 36, window.innerWidth / window.innerHeight, 1, 100000000 );
+	camera.position.z = 3000;
+	camera.lookAt(0, 0, 0);
+	scene = new THREE.Scene();
 
-		this.lights = [];
-		this.lights[ 0 ] = new THREE.PointLight( 0xffffff, .6, 0 );
-		this.lights[ 0 ].position.set( -700, 0, 1000 );
-		this.scene.add( this.lights[ 0 ] );
+	raycaster = new THREE.Raycaster();
+	mouse = new THREE.Vector2();
 
-		this.renderer = new THREE.WebGLRenderer( { antialias: false } );
-		this.renderer.setPixelRatio( window.devicePixelRatio );
-		this.renderer.setSize( window.innerWidth, window.innerHeight );
-		this.container.appendChild( this.renderer.domElement );
-		// this.renderer.domElement.style.zOrder = -1;
+	ambientLight = new THREE.AmbientLight( 0x444444 );
+	scene.add( ambientLight );
 
-		var onWindowResize = function() {
-			this.camera.aspect = window.innerWidth / window.innerHeight;
-			this.camera.updateProjectionMatrix();
-			renderer.setSize( window.innerWidth, window.innerHeight );
-		}
-		window.addEventListener( 'resize', onWindowResize, false );
+	lights = [];
+	lights[ 0 ] = new THREE.PointLight( 0xffffff, .6, 0 );
+	lights[ 0 ].position.set( -700, 0, 1000 );
+	scene.add( lights[ 0 ] );
 
-		// this.controls = new THREE.OrbitControls( this.camera, this.renderer.domElement );
-		// this.controls.enableDamping = true;
-		// this.controls.dampingFactor = 0.25;
-		// this.controls.enableZoom = true;
+	renderer = new THREE.WebGLRenderer( { antialias: false } );
+	renderer.setPixelRatio( window.devicePixelRatio );
+	renderer.setSize( window.innerWidth, window.innerHeight );
+	container.appendChild( renderer.domElement );
 
-		// var onDocumentMouseDown = function( event ) {
-		// 	event.preventDefault();
-		// 	this.mouse.x = ( event.clientX / this.renderer.domElement.clientWidth ) * 2 - 1;
-		// 	this.mouse.y = - ( event.clientY / this.renderer.domElement.clientHeight ) * 2 + 1;
-		// 	this.raycaster.setFromCamera( this.mouse, this.camera );
-
-		// 	var intersects = this.raycaster.intersectObjects( [globeMesh] );
-		// 	if ( intersects.length > 0 ) {
-		// 		console.log(geo_data[intersects[0].face.grid_index]);
-		// 	}
-		// }
-		// document.addEventListener( 'mousedown', onDocumentMouseDown, false );
-
-		this.start = Date.now();
-		this.last = Date.now();
-		this.globe = new Globe(this, geo_data);
-		this.animate();
+	var onWindowResize = function() {
+		camera.aspect = window.innerWidth / window.innerHeight;
+		camera.updateProjectionMatrix();
+		renderer.setSize( window.innerWidth, window.innerHeight );
 	}
+	window.addEventListener( 'resize', onWindowResize, false );
 
-	animate() {
-		requestAnimationFrame( this.animate );
-		this.renderer.render( this.scene, this.camera );
+	// this.controls = new THREE.OrbitControls( this.camera, this.renderer.domElement );
+	// this.controls.enableDamping = true;
+	// this.controls.dampingFactor = 0.25;
+	// this.controls.enableZoom = true;
 
-		var now = Date.now();
-		var elapsed = now - this.last;
-		var deltaTheta = 2 * Math.PI * (elapsed / (MINUTES_PER_DAY * 60000));
-		this.globeMesh.rotation.y += deltaTheta;
-		// $.each(variableMeshes, function(i, mesh) { mesh.rotation.y += deltaTheta });
-		this.last = now;
+	// var onDocumentMouseDown = function( event ) {
+	// 	event.preventDefault();
+	// 	this.mouse.x = ( event.clientX / this.renderer.domElement.clientWidth ) * 2 - 1;
+	// 	this.mouse.y = - ( event.clientY / this.renderer.domElement.clientHeight ) * 2 + 1;
+	// 	this.raycaster.setFromCamera( this.mouse, this.camera );
 
-		elapsed = this.now - this.start;
-		// moonMesh.position.set(
-		// 	38400 * Math.cos(2 * Math.PI * (elapsed / (MINUTES_PER_DAY * 30 * 60000))),
-		// 	0,
-		// 	38400 * Math.sin(-2 * Math.PI * (elapsed / (MINUTES_PER_DAY * 30 * 60000)))
-		// 	);
-	}
+	// 	var intersects = this.raycaster.intersectObjects( [globeMesh] );
+	// 	if ( intersects.length > 0 ) {
+	// 		console.log(geo_data[intersects[0].face.grid_index]);
+	// 	}
+	// }
+	// document.addEventListener( 'mousedown', onDocumentMouseDown, false );
+
+	start = Date.now();
+	last = Date.now();
+	globe = new Globe(geo_data);
+	animate();
 }
 
+var animate = function() {
+	renderer.render( scene, camera );
+
+	var now = Date.now();
+	var elapsed = now - last;
+	var deltaTheta = 2 * Math.PI * (elapsed / (MINUTES_PER_DAY * 60000));
+	globe.globeMesh.rotation.y += deltaTheta;
+	if (variableMesh != null) variableMesh.rotation.y += deltaTheta;
+	last = now;
+
+	elapsed = now - start;
+	// moonMesh.position.set(
+	// 	38400 * Math.cos(2 * Math.PI * (elapsed / (MINUTES_PER_DAY * 30 * 60000))),
+	// 	0,
+	// 	38400 * Math.sin(-2 * Math.PI * (elapsed / (MINUTES_PER_DAY * 30 * 60000)))
+	// 	);
+	requestAnimationFrame( animate );
+}
+
+var loadVariable = function(runId, model, varName) {
+	fetchVariableInfo(runId, model, varName);
+}
+
+var fetchVariableInfo = function(runId, model, varName) {
+	var url = PROVIDER_URI+'/run/'+runId+'/variable/'+model+'/'+varName+'/info';
+	console.log('loading '+url);
+	$.ajax({
+		url: url,
+		dataType: 'json',
+		cache: false,
+		success: function(data) {
+			console.log(data)
+			var times = data.time.values;
+			var lastTime = times[times.length - 1];
+			fetchVariableData(runId, model, varName, lastTime);
+		},
+		error: (xhr, status, error) => {console.error(url, status, error);}
+	});
+}
+
+var fetchVariableData = function(runId, model, varName, lastTime) {
+	var url = PROVIDER_URI+'/run/'+runId+'/variable/'+model+'/'+varName+'/data?time='+lastTime+'&remap=C40962';
+	console.log('loading '+url);
+	$.ajax({
+		url: url,
+		dataType: 'json',
+		cache: false,
+		success: function(varData) {
+			console.log(varData);
+			globe.displayVariable(varData.data, 1.01)
+		},
+		error: (xhr, status, error) => {console.error(url, status, error);}
+	});
+
+}
+
+
 class Globe {
-	constructor(earthScene, geo_data) {
-		this.earthScene = earthScene
+	constructor(geo_data) {
 		var geo = new THREE.Geometry();
 		var vi = 0;
 		$.each(geo_data, function(i) {
@@ -108,7 +149,8 @@ class Globe {
 			} 
 		);
 		this.globeMesh = new THREE.Mesh(geo, material);
-		this.earthScene.scene.add(this.globeMesh);
+		scene.add(this.globeMesh);
+		this.geo_data = geo_data;
 	}
 
 	/* Convert the vertex locations in lat/lon and radius to Cartesian coordinates
@@ -194,7 +236,12 @@ class Globe {
 		return;
 	}
 
-	displayVariable(data, height, min, max) {
+	displayVariable(data, height) {
+		var dataCopy = data.slice().sort();
+		var min = dataCopy[100];
+		var max = dataCopy[dataCopy.length - 100];
+		console.log('['+min+' - '+max+']');
+		scene.remove(variableMesh);
 		var Rv = R * height;
 		var geo = new THREE.Geometry();
 		var vi = 0;
@@ -233,9 +280,9 @@ class Globe {
 				opacity: 0.35
 			} 
 		);
-		var variableMesh = new THREE.Mesh(geo, material);
-		this.earthScene.scene.add(variableMesh);
-		variableMesh.rotation.y = globeMesh.rotation.y;
+		variableMesh = new THREE.Mesh(geo, material);
+		scene.add(variableMesh);
+		variableMesh.rotation.y = globe.globeMesh.rotation.y;
 		// variableMeshes.push(variableMesh);
 	}
 }
@@ -251,5 +298,6 @@ class Globe {
 // }
 
 module.exports = {
-	EarthScene: EarthScene
+	initScene: initScene,
+	loadVariable: loadVariable
 }
