@@ -9,7 +9,7 @@ function toRadians(d) {
 }
 
 class EarthScene {
-	constructor() {
+	constructor(geo_data) {
 		this.container = document.getElementById( 'scene-container' );
 		this.camera = new THREE.PerspectiveCamera( 36, window.innerWidth / window.innerHeight, 1, 100000000 );
 		this.camera.position.z = 3000;
@@ -31,6 +31,7 @@ class EarthScene {
 		this.renderer.setPixelRatio( window.devicePixelRatio );
 		this.renderer.setSize( window.innerWidth, window.innerHeight );
 		this.container.appendChild( this.renderer.domElement );
+		// this.renderer.domElement.style.zOrder = -1;
 
 		var onWindowResize = function() {
 			this.camera.aspect = window.innerWidth / window.innerHeight;
@@ -59,7 +60,7 @@ class EarthScene {
 
 		this.start = Date.now();
 		this.last = Date.now();
-		this.globe = new Globe(this);
+		this.globe = new Globe(this, geo_data);
 		this.animate();
 	}
 
@@ -84,13 +85,13 @@ class EarthScene {
 }
 
 class Globe {
-	constructor(earthScene) {
+	constructor(earthScene, geo_data) {
 		this.earthScene = earthScene
-		this.geo = new THREE.Geometry();
+		var geo = new THREE.Geometry();
 		var vi = 0;
-		$.each(json, function(i) {
-			var cell = json[i];
-			createCellGeometry(geo, cell, R, vi);
+		$.each(geo_data, function(i) {
+			var cell = geo_data[i];
+			Globe.createCellGeometry(geo, cell, R, vi);
 			vi = vi + 12;
 		});
 		geo.computeBoundingSphere();
@@ -107,12 +108,12 @@ class Globe {
 			} 
 		);
 		this.globeMesh = new THREE.Mesh(geo, material);
-		this.earthScene.scene.add(globeMesh);
+		this.earthScene.scene.add(this.globeMesh);
 	}
 
 	/* Convert the vertex locations in lat/lon and radius to Cartesian coordinates
 	 */
-	getVertexPositions(cellData, R) {
+	static getVertexPositions(cellData, R) {
 		return $.map(cellData.vertices, function(v) {
 			return [[-1 * R * Math.cos(toRadians(v[1])) * Math.cos(toRadians(v[0])),
 							 1 * R * Math.sin(toRadians(v[1])),
@@ -127,8 +128,8 @@ class Globe {
 			dR = R * (.00001 * cell.atts.STD_ELEV);
 		else
 			dR = 0;
-		var vp1 = getVertexPositions(cell, R + dR);
-		var vp2 = getVertexPositions(cell, R - dR);
+		var vp1 = Globe.getVertexPositions(cell, R + dR);
+		var vp2 = Globe.getVertexPositions(cell, R - dR);
 		geo.vertices.push(
 			new THREE.Vector3(vp1[0][0], vp1[0][1], vp1[0][2]),
 			new THREE.Vector3(vp1[1][0], vp1[1][1], vp1[1][2]),
@@ -143,7 +144,7 @@ class Globe {
 			new THREE.Vector3(vp2[4][0], vp2[4][1], vp2[4][2]),
 			new THREE.Vector3(vp2[5][0], vp2[5][1], vp2[5][2])
 		);
-		faces = [
+		var faces = [
 			// outer tile
 			new THREE.Face3(0+vi, 1+vi, 2+vi),
 			new THREE.Face3(3+vi, 4+vi, 5+vi),
@@ -198,7 +199,7 @@ class Globe {
 		var geo = new THREE.Geometry();
 		var vi = 0;
 		$.each(this.geo_data, function(i, cell) {
-			var vp = getVertexPositions(cell, Rv);
+			var vp = Globe.getVertexPositions(cell, Rv);
 			geo.vertices.push(
 				new THREE.Vector3(vp[0][0], vp[0][1], vp[0][2]),
 				new THREE.Vector3(vp[1][0], vp[1][1], vp[1][2]),

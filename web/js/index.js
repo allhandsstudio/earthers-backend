@@ -57,8 +57,8 @@ var menuStyle = {
     }
 
 var inputStyle = {
-	fontSize: '18px',
-	marginTop: '8px'
+	fontSize: '14px',
+	marginTop: '4px'
 }
 
 function matchToTerm (field) {
@@ -75,10 +75,17 @@ var ControlPanel = React.createClass({
 
 var ViewPanel = React.createClass({
 	render: function() {
-		return (<div id="scene-container"/>)
+		return (
+			<div 
+				id="scene-container" 
+				style={{ position: "fixed", left: "0px", top: "0px", zIndex: -1}}
+			/>
+		)
 	},
 	componentDidMount: function() {
+		console.log('Loading geo data');
 		$.getJSON("./data/geodesic_data.json", function(json) {
+			console.log('done loading geo data');
 			new EarthScene(json);
 		});		
 	}
@@ -96,9 +103,9 @@ var SearchBar = React.createClass({
 	},
 	render: function() {
 		return (
-			<FormGroup bsSize="large">
+			<FormGroup>
 			<Col sm={2} componentClass={ControlLabel}>Run</Col>
-			<Col sm={4}><AutoComplete 
+			<Col sm={2}><AutoComplete 
 				value={this.state.searchText}
 				items={this.props.getItems}
 				inputProps={{ id: "run-search", style: inputStyle}}
@@ -137,9 +144,9 @@ var OutputVariablePicker = React.createClass({
 	},
 	render: function() {
 		return (
-			<FormGroup bsSize="large">
-			<Col sm={2} componentClass={ControlLabel}>Variable</Col>
-			<Col sm={4}><AutoComplete
+			<FormGroup>
+			<Col sm={2} componentClass={ControlLabel}>Var.</Col>
+			<Col sm={2}><AutoComplete
 				value={this.state.searchText}
 				items={this.props.getItems}
 				inputProps={{ id: "variable-search", style: inputStyle, disabled: this.props.disabled }}
@@ -211,9 +218,9 @@ var NavigatorPanel = React.createClass({
 
 	render: function() {
 		return (
-			<Panel className="navigatorPanel" width="20%">
+			<Panel className="navigatorPanel" style={{padding:"0px"}}>
 				<Form horizontal>
-					<FormGroup><Col lg={6}><h1>Earther</h1></Col></FormGroup>
+					<FormGroup><Col sm={3}><h1>Earther</h1></Col></FormGroup>
 					<SearchBar 
 						getItems={this.state.runs}
 						loadRun={this.loadRun}
@@ -221,7 +228,6 @@ var NavigatorPanel = React.createClass({
 					
 					<OutputVariablePicker 
 						getItems={this.state.variables}
-						disabled={() => {this.state.loading}}
 					/>
 					<FormGroup>
 						<Col smOffset={2} sm={2}>
@@ -237,7 +243,7 @@ var NavigatorPanel = React.createClass({
 var MainPanel = React.createClass({
 	render: function() {
 		return (
-			<div className="mainPanel">
+			<div className="mainPanel"  style={{width: "20%"}}>
 				<NavigatorPanel />
 				<ControlPanel />
 				<ViewPanel />
