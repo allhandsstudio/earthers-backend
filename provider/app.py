@@ -33,9 +33,18 @@ RUNS_ATTRIBUTES = [
     'RUN_TYPE',
     'CONTINUE_RUN'    
 ]
+
 MODELS = ['atm', 'lnd', 'ocn', 'ice', 'rof']
 
+SOURCE_GRIDS = {
+    3312: '4x5',
+    13824: '1.9x2.5',
+    55296: '0.9x1.25'
+}
+
+
 app = Chalice(app_name='provider')
+app.debug = True
 
 dynamo = boto3.resource('dynamodb')
 runs_table = dynamo.Table(RUNS_TABLE)
@@ -43,6 +52,7 @@ runs_table = dynamo.Table(RUNS_TABLE)
 s3 = boto3.resource('s3', region_name='us-west-2')
 bucket = s3.Bucket(BUCKET)
 remap_data = {}
+new_remap_weights = {}
 
 @app.route('/')
 def index():
@@ -130,16 +140,24 @@ def variable_info(run_id, modelname, varname):
 
 
 def get_time_index(nc, time_arg):
+    int_time = int(time_arg)
+    times = [int(t) for t in list(nc.variables['time'])]
     try:
-        time_index = list(nc.variables['time']).index(int(time_arg))
+        time_index = times.index(int(time_arg))
     except ValueError as e:
+        # be forgiving, and return smallest time >= given time
+        for i in range(len(times)):
+            if int_time <= times[i]:
+                logger.info('returning {} for {}'.format(times[i], time_arg))
+                return i
         return None
+
     return time_index
 
 
 def load_remap_data(source_grid, target_grid):
     logger.info('Loading remap data from {} to {}'.format(source_grid, target_grid))
-    filename = 'remap_data_{}_to_{}.pickle'.format(source_grid, target_grid)
+    filename = 'remap_weights_{}_to_{}.pickle'.format(source_grid, target_grid)
     key = 'remap-data/'+filename
     pickle_file = '/tmp/'+filename
     obj = s3.Object(BUCKET, key)
@@ -148,14 +166,11 @@ def load_remap_data(source_grid, target_grid):
         with open(pickle_file, 'r') as fd:
             tmp = pickle.load(fd)
             remap_data[(source_grid, target_grid)] = tmp
-        # FIXME: save remapped version back to S3
     except ClientError as e:
         logger.info(e)
         logger.info('Remapping file from {} to {} not found'.format(source_grid, target_grid))
     except e:
         logger.info(e)
-
-# load_remap_data('4x5', 'C40962')
 
 
 def remap_variable(source_grid, target_grid, data):
@@ -164,32 +179,54 @@ def remap_variable(source_grid, target_grid, data):
         load_remap_data(source_grid, target_grid)
     if (source_grid, target_grid) not in remap_data:
         return None
-    rd = remap_data[(source_grid, target_grid)]
 
-    output = [0] * rd['target_size']
-    var_slice = data.reshape([data.shape[0] * data.shape[1], 1])
-    for gi in range(1, rd['target_size']):
-        if gi not in rd['a_to_s'] or gi not in rd['a_to_b']:
-            logger.info('grid {} not found'.format(gi))
-            continue
-        try:
-            w = rd['a_to_s'][gi]
-            b_inds = rd['a_to_b'][gi]
-            v = var_slice[b_inds][:]
-            v = v.reshape((v.shape[0],))
-            a = rd['b_areas'][gi]
-            output[gi] = np.dot(np.multiply(v,a),w) / rd['area_a'][gi]
-        except IndexError as e:
-            logger.info('error {}'.format(gi))
-        except e:
-            logger.info(e)
-    return output
+    rd = remap_data[(source_grid, target_grid)]
+    I = rd['I']
+    W = rd['W']
+    N = len(I)
+
+    data = data.reshape((data.shape[0]*data.shape[1],))
+    out = [np.dot(data[I[j]], W[j]) for j in range(N)]
+
+    return out
+
+
+def get_cache_key(run_id, modelname, varname, time, grid):
+    key = 'cached-data/{}/{}/{}/{}'.format(
+        run_id, modelname.lower(), varname.lower(), str(int(time)))
+    if grid:
+        key = key+'/'+grid
+    return key
+
+
+def load_cached(run_id, modelname, varname, time, grid):
+    key = get_cache_key(run_id, modelname, varname, time, grid)
+    cache_file = '/tmp/'+key.replace('/','_')
+    obj = s3.Object(BUCKET, key)
+    try:
+        obj.download_file(cache_file)
+    except ClientError as e:
+        # not in cache
+        return None
+
+    with open(cache_file, 'r') as fd:
+         x = pickle.load(fd)
+         return x
+
+
+def save_cached(run_id, modelname, varname, time, grid, data):
+    key = get_cache_key(run_id, modelname, varname, time, grid)
+    cache_file = '/tmp/'+key.replace('/','_')
+    logger.info('save {} to {}'.format(cache_file, key))
+
+    with open(cache_file, 'wb') as fd:
+        pickle.dump(data, fd, pickle.HIGHEST_PROTOCOL)
+
+    s3.meta.client.upload_file(cache_file, BUCKET, key)
 
 
 @app.route('/run/{run_id}/variable/{modelname}/{varname}/data')
 def variable_data(run_id, modelname, varname):
-    nc = load_nc_file(run_id, modelname, varname)
-    
     params = app.current_request.query_params
     target_grid = params.get('remap', None)
     logger.info('target grid {}'.format(target_grid))      
@@ -197,31 +234,54 @@ def variable_data(run_id, modelname, varname):
     time_arg = params.get('time', None)
     if not time_arg:
         return {'error': 'Must supply time param'}
-    
-    time_index = get_time_index(nc, time_arg)
-    if not time_index:
-        return {'error': 'Time {} not found in {} variable {} {}'.format(
-            time_arg, run_id, modelname, varname)}
 
-    data = nc.variables[varname].data
-    if len(data.shape) == 4:
-        level_arg = params.get('time', 0)
-        data = data[:,level_arg,:,:]
-    data_slice = data[time_index,:,:]
-    source_grid = '4x5' #FIXME infer from data
+    cached = None
     if target_grid:
-        as_list = remap_variable(source_grid, target_grid, data_slice)
-        if not as_list:
-            return {'error': 'Remap option {} not recognized'.format(remap_arg)}
-    else:
-        as_list = [[float(f) for f in a] for a in list(data_slice)]
+        cached = load_cached(run_id, modelname, varname, time_arg, target_grid)
 
+    levels = [0]
+    as_lists = []
+    if cached:
+        logger.info('{} {} {} loaded from cache'.format(run_id, modelname, varname))
+        as_list = cached
+    else:
+        logger.info('{} {} {} not found in cache'.format(run_id, modelname, varname))
+        nc = load_nc_file(run_id, modelname, varname)
+
+        time_index = get_time_index(nc, time_arg)
+        if time_index == None:
+            return {'error': 'Time {} not found in {} variable {} {}'.format(
+                time_arg, run_id, modelname, varname)}
+
+        data = nc.variables[varname].data
+        if len(data.shape) == 4:
+            levels = range(data.shape[1])
+
+        for level in levels:
+            level_data = data[:,level,:,:]
+            data_slice = level_data[time_index,:,:]
+            num_cells = np.prod(data_slice.shape)
+            source_grid = SOURCE_GRIDS.get(num_cells, None)
+
+            if target_grid:
+                as_list = remap_variable(source_grid, target_grid, data_slice)
+                as_lists.append(as_list)
+                if not as_list:
+                    return {'error': 'Remap option {} not recognized'.format(target_grid)}
+            else:
+                as_lists.append([[float(f) for f in a] for a in list(data_slice)])
+        if len(levels) == 1:
+            as_lists = as_lists[0]
+
+        save_cached(run_id, modelname, varname, time_arg, target_grid, as_lists)
+    
     return {
         'run_id': run_id,
         'model': modelname,
         'variable': varname,
         'time': time_arg,
-        'data': as_list
+        'levels': levels,
+        'data': as_lists
     }
 
 
