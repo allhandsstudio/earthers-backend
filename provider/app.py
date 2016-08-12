@@ -191,16 +191,19 @@ def remap_variable(source_grid, target_grid, data):
     return out
 
 
-def get_cache_key(run_id, modelname, varname, time, grid):
-    key = 'cached-data/{}/{}/{}/{}'.format(
+def get_cache_key(run_id, modelname, varname, levels, time, grid):
+    key = 'cached-data/run-{}/model-{}/var-{}/time-{}'.format(
         run_id, modelname.lower(), varname.lower(), str(int(time)))
+    if len(levels) == 1:
+        key = key+'/level-'+str(levels[0])
     if grid:
-        key = key+'/'+grid
+        key = key+'/grid-'+grid
     return key
 
 
-def load_cached(run_id, modelname, varname, time, grid):
-    key = get_cache_key(run_id, modelname, varname, time, grid)
+def load_cached(run_id, modelname, varname, levels, time, grid):
+    key = get_cache_key(run_id, modelname, varname, levels, time, grid)
+
     cache_file = '/tmp/'+key.replace('/','_')
     obj = s3.Object(BUCKET, key)
     try:
@@ -214,8 +217,8 @@ def load_cached(run_id, modelname, varname, time, grid):
          return x
 
 
-def save_cached(run_id, modelname, varname, time, grid, data):
-    key = get_cache_key(run_id, modelname, varname, time, grid)
+def save_cached(run_id, modelname, varname, levels, time, grid, data):
+    key = get_cache_key(run_id, modelname, varname, levels, time, grid)
     cache_file = '/tmp/'+key.replace('/','_')
     logger.info('save {} to {}'.format(cache_file, key))
 
@@ -235,15 +238,20 @@ def variable_data(run_id, modelname, varname):
     if not time_arg:
         return {'error': 'Must supply time param'}
 
+    level_arg = params.get('level', None)
+    levels = [0]
+    if level_arg:
+        levels[0] = int(level_arg)
+
     cached = None
     if target_grid:
-        cached = load_cached(run_id, modelname, varname, time_arg, target_grid)
+        cached = load_cached(run_id, modelname, varname, levels, time_arg, target_grid)
 
-    levels = [0]
     as_lists = []
+
     if cached:
         logger.info('{} {} {} loaded from cache'.format(run_id, modelname, varname))
-        as_list = cached
+        as_lists = cached
     else:
         logger.info('{} {} {} not found in cache'.format(run_id, modelname, varname))
         nc = load_nc_file(run_id, modelname, varname)
@@ -255,10 +263,16 @@ def variable_data(run_id, modelname, varname):
 
         data = nc.variables[varname].data
         if len(data.shape) == 4:
-            levels = range(data.shape[1])
+            if level_arg:
+                data = data[:,levels[0],:,:]
+            else:
+                levels = range(data.shape[1])
 
         for level in levels:
-            level_data = data[:,level,:,:]
+            if len(levels) == 1:
+                level_data = data
+            else:
+                level_data = data[:,level,:,:]
             data_slice = level_data[time_index,:,:]
             num_cells = np.prod(data_slice.shape)
             source_grid = SOURCE_GRIDS.get(num_cells, None)
@@ -273,14 +287,13 @@ def variable_data(run_id, modelname, varname):
         if len(levels) == 1:
             as_lists = as_lists[0]
 
-        save_cached(run_id, modelname, varname, time_arg, target_grid, as_lists)
+        save_cached(run_id, modelname, varname, levels, time_arg, target_grid, as_lists)
     
     return {
         'run_id': run_id,
         'model': modelname,
         'variable': varname,
         'time': time_arg,
-        'levels': levels,
         'data': as_lists
     }
 
