@@ -14,7 +14,8 @@
     "react-autocomplete": "^1.1.0",
     "jquery": "^3.1.0",
     "react-bootstrap": "^0.30.2",
-    "three": "^0.79.0"
+    "three": "^0.79.0",
+    "tween.js": "^16.3.5"
   },
   "scripts": {
     "build": "browserify ./js/index.js -t babelify -o bundle.js",

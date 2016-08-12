@@ -62,9 +62,10 @@ var inputStyle = {
 	marginTop: '4px'
 };
 
-function matchToTerm (field) {
+function matchToTerm (fields) {
 	return function(item, value) {
-		return item[field].toLowerCase().indexOf(value.toLowerCase()) !== -1 		
+		if (value === '') return true;
+		return fields.some((field) => item[field].toLowerCase().indexOf(value.toLowerCase()) !== -1);
 	}
 }
 
@@ -112,7 +113,7 @@ var SearchBar = React.createClass({
 				inputProps={{ id: "run-search", style: inputStyle}}
 				menuStyle={menuStyle}
 				getItemValue={(item) => item.InstanceId}
-				shouldItemRender={matchToTerm('InstanceId')}
+				shouldItemRender={matchToTerm(['InstanceId', 'CreatedTime'])}
 				onChange={(event, value) => this.setState( {  searchText: value } )}
 				onSelect={this.onRunSelect}
 				renderItem={(item, isHighlighted) => (
@@ -140,7 +141,7 @@ var OutputVariablePicker = React.createClass({
 		}
 	},
 	onVariableSelect: function(item) {
-		this.setState({ searchText: item.model+' - '+item.varName });
+		this.setState({ searchText: item.model + '/' + item.varName });
 		this.props.variableSelected(item)
 	},
 	render: function() {
@@ -153,14 +154,14 @@ var OutputVariablePicker = React.createClass({
 				inputProps={{ id: "variable-search", style: inputStyle, disabled: this.props.disabled }}
 				menuStyle={menuStyle}
 				getItemValue={(item) => item}
-				shouldItemRender={matchToTerm('varName')}
+				shouldItemRender={matchToTerm(['varName', 'description'])}
 				onChange={(event, value) => this.setState({ searchText: value })}
 				onSelect={this.onVariableSelect}
 				renderItem={(item, isHighlighted) => (
 		            <div
 		              style={isHighlighted ? styles.highlightedItem : styles.item}
 		              key={item.model+'_'+item.varName}
-		            >{item.model} - {item.varName}</div>
+		            >{item.type} {item.model}/{item.varName} - {item.description} ({item.units})</div>
           			)}			
 			/></Col>
 			</FormGroup>
@@ -200,22 +201,18 @@ var NavigatorPanel = React.createClass({
 		this.setLoading(true);
 		this.props.selectRun(runId);
 		$.ajax({
-			url: PROVIDER_URI+'/run/'+runId,
-			dataType: 'json',
-			cache: false,
-			success: function(data) {
-				var variables = $.map(
-					data.output, 
-					function(v, i) { return {varName: v[1], model: v[0], key: v[2]} }
-				);
-				this.setState({ variables: variables });
+			dataType: "json",
+			url: "./data/variable_descriptions.json",
+			success: function(json) {
+				this.setState({ variables: json });
 				this.setLoading(false);
 			}.bind(this),
-			error: function(xhr, status, error) {
-				console.error('url', status, error); 
-				this.setLoading(false);
-			}.bind(this)			
-		})
+			cache: false
+		});
+		// $.getJSON("./data/variable_descriptions.json", function(json) {
+		// 	this.setState({ variables: json });
+		// 	this.setLoading(false);
+		// }.bind(this));
 	},
 
 	render: function() {
@@ -255,11 +252,9 @@ var MainPanel = React.createClass({
 		}
 	},
 	onLoadButtonClick: function() {
-		console.log(this.state.selectedRun);
-		console.log(this.state.selectedVariable);
 		// ugly to use global variable, but whatever
-		loadVariableIntoScene(
-			this.state.selectedRun, this.state.selectedVariable.model, this.state.selectedVariable.varName);
+
+		loadVariableIntoScene(this.state.selectedRun, this.state.selectedVariable);
 	},
 	render: function() {
 		return (
