@@ -1,0 +1,522 @@
+--
+-- PostgreSQL database dump
+--
+
+-- Dumped from database version 9.5.4
+-- Dumped by pg_dump version 9.5.3
+
+SET statement_timeout = 0;
+SET lock_timeout = 0;
+SET client_encoding = 'UTF8';
+SET standard_conforming_strings = on;
+SET check_function_bodies = false;
+SET client_min_messages = warning;
+SET row_security = off;
+
+--
+-- Name: plpgsql; Type: EXTENSION; Schema: -; Owner: 
+--
+
+CREATE EXTENSION IF NOT EXISTS plpgsql WITH SCHEMA pg_catalog;
+
+
+--
+-- Name: EXTENSION plpgsql; Type: COMMENT; Schema: -; Owner: 
+--
+
+COMMENT ON EXTENSION plpgsql IS 'PL/pgSQL procedural language';
+
+
+SET search_path = public, pg_catalog;
+
+SET default_tablespace = '';
+
+SET default_with_oids = false;
+
+--
+-- Name: energy_demand; Type: TABLE; Schema: public; Owner: awsuser
+--
+
+CREATE TABLE energy_demand (
+    id integer NOT NULL,
+    run_id character varying(32) NOT NULL,
+    region character varying NOT NULL,
+    demand_item character varying NOT NULL,
+    value_type character varying,
+    year character varying(4),
+    value real NOT NULL
+);
+
+
+ALTER TABLE energy_demand OWNER TO awsuser;
+
+--
+-- Name: energy_demand_id_seq; Type: SEQUENCE; Schema: public; Owner: awsuser
+--
+
+CREATE SEQUENCE energy_demand_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE energy_demand_id_seq OWNER TO awsuser;
+
+--
+-- Name: energy_demand_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: awsuser
+--
+
+ALTER SEQUENCE energy_demand_id_seq OWNED BY energy_demand.id;
+
+
+--
+-- Name: period; Type: TABLE; Schema: public; Owner: awsuser
+--
+
+CREATE TABLE period (
+    id integer NOT NULL,
+    run_id character varying(32) NOT NULL,
+    region character varying NOT NULL,
+    sector character varying NOT NULL,
+    subsector character varying NOT NULL,
+    technology character varying,
+    is_transportation boolean DEFAULT false,
+    is_agriculture boolean DEFAULT false,
+    year character varying(4) NOT NULL,
+    share_weight real,
+    cal_value real,
+    yield real,
+    harvests_per_year real,
+    non_land_variable_cost real,
+    fixed_output real,
+    input_capital real,
+    input_om_fixed real,
+    trial_market_price real,
+    load_factor real,
+    ag_prod_change real,
+    item_name character varying,
+    renewable_input character varying
+);
+
+
+ALTER TABLE period OWNER TO awsuser;
+
+--
+-- Name: period_id_seq; Type: SEQUENCE; Schema: public; Owner: awsuser
+--
+
+CREATE SEQUENCE period_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE period_id_seq OWNER TO awsuser;
+
+--
+-- Name: period_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: awsuser
+--
+
+ALTER SEQUENCE period_id_seq OWNED BY period.id;
+
+
+--
+-- Name: price; Type: TABLE; Schema: public; Owner: awsuser
+--
+
+CREATE TABLE price (
+    id integer NOT NULL,
+    run_id character varying(32) NOT NULL,
+    region character varying NOT NULL,
+    price_item character varying NOT NULL,
+    price_type character varying NOT NULL,
+    year character varying(4),
+    value real NOT NULL
+);
+
+
+ALTER TABLE price OWNER TO awsuser;
+
+--
+-- Name: price_id_seq; Type: SEQUENCE; Schema: public; Owner: awsuser
+--
+
+CREATE SEQUENCE price_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE price_id_seq OWNER TO awsuser;
+
+--
+-- Name: price_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: awsuser
+--
+
+ALTER SEQUENCE price_id_seq OWNED BY price.id;
+
+
+--
+-- Name: subsector_shareweight; Type: TABLE; Schema: public; Owner: awsuser
+--
+
+CREATE TABLE subsector_shareweight (
+    id integer NOT NULL,
+    run_id character varying(32) NOT NULL,
+    region character varying NOT NULL,
+    sector character varying NOT NULL,
+    subsector character varying NOT NULL,
+    is_transportation boolean DEFAULT false,
+    is_agriculture boolean DEFAULT false,
+    year character varying(4),
+    value real NOT NULL
+);
+
+
+ALTER TABLE subsector_shareweight OWNER TO awsuser;
+
+--
+-- Name: subsector_shareweight_id_seq; Type: SEQUENCE; Schema: public; Owner: awsuser
+--
+
+CREATE SEQUENCE subsector_shareweight_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE subsector_shareweight_id_seq OWNER TO awsuser;
+
+--
+-- Name: subsector_shareweight_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: awsuser
+--
+
+ALTER SEQUENCE subsector_shareweight_id_seq OWNED BY subsector_shareweight.id;
+
+
+--
+-- Name: tech_emission; Type: TABLE; Schema: public; Owner: awsuser
+--
+
+CREATE TABLE tech_emission (
+    id integer NOT NULL,
+    run_id character varying(32) NOT NULL,
+    region character varying NOT NULL,
+    sector character varying NOT NULL,
+    subsector character varying NOT NULL,
+    technology character varying NOT NULL,
+    year character varying(4) NOT NULL,
+    chem character varying(16) NOT NULL,
+    emiss_coef real NOT NULL
+);
+
+
+ALTER TABLE tech_emission OWNER TO awsuser;
+
+--
+-- Name: tech_emission_id_seq; Type: SEQUENCE; Schema: public; Owner: awsuser
+--
+
+CREATE SEQUENCE tech_emission_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE tech_emission_id_seq OWNER TO awsuser;
+
+--
+-- Name: tech_emission_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: awsuser
+--
+
+ALTER SEQUENCE tech_emission_id_seq OWNED BY tech_emission.id;
+
+
+--
+-- Name: id; Type: DEFAULT; Schema: public; Owner: awsuser
+--
+
+ALTER TABLE ONLY energy_demand ALTER COLUMN id SET DEFAULT nextval('energy_demand_id_seq'::regclass);
+
+
+--
+-- Name: id; Type: DEFAULT; Schema: public; Owner: awsuser
+--
+
+ALTER TABLE ONLY period ALTER COLUMN id SET DEFAULT nextval('period_id_seq'::regclass);
+
+
+--
+-- Name: id; Type: DEFAULT; Schema: public; Owner: awsuser
+--
+
+ALTER TABLE ONLY price ALTER COLUMN id SET DEFAULT nextval('price_id_seq'::regclass);
+
+
+--
+-- Name: id; Type: DEFAULT; Schema: public; Owner: awsuser
+--
+
+ALTER TABLE ONLY subsector_shareweight ALTER COLUMN id SET DEFAULT nextval('subsector_shareweight_id_seq'::regclass);
+
+
+--
+-- Name: id; Type: DEFAULT; Schema: public; Owner: awsuser
+--
+
+ALTER TABLE ONLY tech_emission ALTER COLUMN id SET DEFAULT nextval('tech_emission_id_seq'::regclass);
+
+
+--
+-- Name: energy_demand_pkey; Type: CONSTRAINT; Schema: public; Owner: awsuser
+--
+
+ALTER TABLE ONLY energy_demand
+    ADD CONSTRAINT energy_demand_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: period_pkey; Type: CONSTRAINT; Schema: public; Owner: awsuser
+--
+
+ALTER TABLE ONLY period
+    ADD CONSTRAINT period_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: price_pkey; Type: CONSTRAINT; Schema: public; Owner: awsuser
+--
+
+ALTER TABLE ONLY price
+    ADD CONSTRAINT price_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: subsector_shareweight_pkey; Type: CONSTRAINT; Schema: public; Owner: awsuser
+--
+
+ALTER TABLE ONLY subsector_shareweight
+    ADD CONSTRAINT subsector_shareweight_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: tech_emission_pkey; Type: CONSTRAINT; Schema: public; Owner: awsuser
+--
+
+ALTER TABLE ONLY tech_emission
+    ADD CONSTRAINT tech_emission_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: energy_demand_item_index; Type: INDEX; Schema: public; Owner: awsuser
+--
+
+CREATE INDEX energy_demand_item_index ON energy_demand USING btree (demand_item);
+
+
+--
+-- Name: energy_demand_region_index; Type: INDEX; Schema: public; Owner: awsuser
+--
+
+CREATE INDEX energy_demand_region_index ON energy_demand USING btree (region);
+
+
+--
+-- Name: energy_demand_type_index; Type: INDEX; Schema: public; Owner: awsuser
+--
+
+CREATE INDEX energy_demand_type_index ON energy_demand USING btree (value_type);
+
+
+--
+-- Name: energy_demand_year_index; Type: INDEX; Schema: public; Owner: awsuser
+--
+
+CREATE INDEX energy_demand_year_index ON energy_demand USING btree (year);
+
+
+--
+-- Name: period_is_ag_index; Type: INDEX; Schema: public; Owner: awsuser
+--
+
+CREATE INDEX period_is_ag_index ON period USING btree (is_agriculture);
+
+
+--
+-- Name: period_is_tr_index; Type: INDEX; Schema: public; Owner: awsuser
+--
+
+CREATE INDEX period_is_tr_index ON period USING btree (is_transportation);
+
+
+--
+-- Name: period_region_index; Type: INDEX; Schema: public; Owner: awsuser
+--
+
+CREATE INDEX period_region_index ON period USING btree (region);
+
+
+--
+-- Name: period_sector_index; Type: INDEX; Schema: public; Owner: awsuser
+--
+
+CREATE INDEX period_sector_index ON period USING btree (sector);
+
+
+--
+-- Name: period_subsector_index; Type: INDEX; Schema: public; Owner: awsuser
+--
+
+CREATE INDEX period_subsector_index ON period USING btree (subsector);
+
+
+--
+-- Name: period_technology_index; Type: INDEX; Schema: public; Owner: awsuser
+--
+
+CREATE INDEX period_technology_index ON period USING btree (technology);
+
+
+--
+-- Name: period_year_index; Type: INDEX; Schema: public; Owner: awsuser
+--
+
+CREATE INDEX period_year_index ON period USING btree (year);
+
+
+--
+-- Name: price_item_index; Type: INDEX; Schema: public; Owner: awsuser
+--
+
+CREATE INDEX price_item_index ON price USING btree (price_item);
+
+
+--
+-- Name: price_region_index; Type: INDEX; Schema: public; Owner: awsuser
+--
+
+CREATE INDEX price_region_index ON price USING btree (region);
+
+
+--
+-- Name: price_type_index; Type: INDEX; Schema: public; Owner: awsuser
+--
+
+CREATE INDEX price_type_index ON price USING btree (price_type);
+
+
+--
+-- Name: price_year; Type: INDEX; Schema: public; Owner: awsuser
+--
+
+CREATE INDEX price_year ON price USING btree (year);
+
+
+--
+-- Name: subsector_shareweight_is_ag_index; Type: INDEX; Schema: public; Owner: awsuser
+--
+
+CREATE INDEX subsector_shareweight_is_ag_index ON subsector_shareweight USING btree (is_agriculture);
+
+
+--
+-- Name: subsector_shareweight_is_tr_index; Type: INDEX; Schema: public; Owner: awsuser
+--
+
+CREATE INDEX subsector_shareweight_is_tr_index ON subsector_shareweight USING btree (is_transportation);
+
+
+--
+-- Name: subsector_shareweight_region_index; Type: INDEX; Schema: public; Owner: awsuser
+--
+
+CREATE INDEX subsector_shareweight_region_index ON subsector_shareweight USING btree (region);
+
+
+--
+-- Name: subsector_shareweight_sector_index; Type: INDEX; Schema: public; Owner: awsuser
+--
+
+CREATE INDEX subsector_shareweight_sector_index ON subsector_shareweight USING btree (sector);
+
+
+--
+-- Name: subsector_shareweight_subsector_index; Type: INDEX; Schema: public; Owner: awsuser
+--
+
+CREATE INDEX subsector_shareweight_subsector_index ON subsector_shareweight USING btree (subsector);
+
+
+--
+-- Name: subsector_shareweight_year_index; Type: INDEX; Schema: public; Owner: awsuser
+--
+
+CREATE INDEX subsector_shareweight_year_index ON subsector_shareweight USING btree (year);
+
+
+--
+-- Name: tech_emission_chem_index; Type: INDEX; Schema: public; Owner: awsuser
+--
+
+CREATE INDEX tech_emission_chem_index ON tech_emission USING btree (chem);
+
+
+--
+-- Name: tech_emission_region_index; Type: INDEX; Schema: public; Owner: awsuser
+--
+
+CREATE INDEX tech_emission_region_index ON tech_emission USING btree (region);
+
+
+--
+-- Name: tech_emission_sector_index; Type: INDEX; Schema: public; Owner: awsuser
+--
+
+CREATE INDEX tech_emission_sector_index ON tech_emission USING btree (sector);
+
+
+--
+-- Name: tech_emission_subsector_index; Type: INDEX; Schema: public; Owner: awsuser
+--
+
+CREATE INDEX tech_emission_subsector_index ON tech_emission USING btree (subsector);
+
+
+--
+-- Name: tech_emission_technology_index; Type: INDEX; Schema: public; Owner: awsuser
+--
+
+CREATE INDEX tech_emission_technology_index ON tech_emission USING btree (technology);
+
+
+--
+-- Name: tech_emission_year_index; Type: INDEX; Schema: public; Owner: awsuser
+--
+
+CREATE INDEX tech_emission_year_index ON tech_emission USING btree (year);
+
+
+--
+-- Name: public; Type: ACL; Schema: -; Owner: awsuser
+--
+
+REVOKE ALL ON SCHEMA public FROM PUBLIC;
+REVOKE ALL ON SCHEMA public FROM awsuser;
+GRANT ALL ON SCHEMA public TO awsuser;
+GRANT ALL ON SCHEMA public TO PUBLIC;
+
+
+--
+-- PostgreSQL database dump complete
+--
+
