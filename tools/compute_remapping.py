@@ -22,7 +22,7 @@ def to_deg(r):
     return ((r % 2*PI) / (2*PI)) * 360 - 180
 
 def to_rad(d):
-    return ((d % 360) / 360) * 2 * PI - (PI/24)
+    return ((d % 360) / 360) * 2 * PI
 
 def dist(p1, p2):
     # https://en.wikipedia.org/wiki/Great-circle_distance
