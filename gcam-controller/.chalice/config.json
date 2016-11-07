@@ -1,0 +1,5 @@
+{
+  "lambda_arn": "arn:aws:lambda:us-west-2:811920840952:function:gcam-controller", 
+  "app_name": "gcam-controller", 
+  "stage": "dev"
+}

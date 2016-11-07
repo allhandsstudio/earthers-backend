@@ -1,0 +1,1 @@
+A chalice app that provides GCAM job execution control. Requires AWS infra from `../infratraucture/gcam.tf`
