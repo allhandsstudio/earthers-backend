@@ -1,0 +1,1 @@
+A chalice app that provides GCAM querying and results. Requires AWS infra from `../infratraucture/gcam.tf`
